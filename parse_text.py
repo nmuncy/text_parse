@@ -1,10 +1,3 @@
-# %%
-import os
-import re
-import csv
-import string
-import fnmatch
-
 """
 Notes:
 
@@ -35,12 +28,18 @@ TODO:
 
 
 # %%
+import os
+import re
+import csv
+import string
+
+
 # set orientings vars, make output location
 parent_dir = os.getcwd()
 data_dir = os.path.join(parent_dir, "txt_files")
 data_list = os.listdir(data_dir)
 
-problem_list = ["SPCA", "HIV", "AIDS"]
+problem_list = ["SPCA", "HIV", "AIDS", "DDI", "ABC"]
 
 
 # for in_file in data_list:
@@ -51,30 +50,35 @@ out_dir = os.path.join(parent_dir, "csv_files", txt_file.split(".")[0])
 if not os.path.exists(out_dir):
     os.mkdir(out_dir)
 
-
-# %%
 # read in txt file as dictionary
 text_lines = {}
 with open(in_file, "r", encoding="utf-8") as text_file:
     for c, line in enumerate(text_file):
         text_lines[c] = line
 
-# %%
 # start counter for whole file
 running_total = 0
+line_total_dict = {}
 
 # iterate through lines of file
 for key in text_lines:
+    # key = 759
 
     # clean oddities
     line_clean = text_lines[key].replace("voice-over", "")
     line_clean = line_clean.replace(" : ", ": ")
+    line_clean = line_clean.replace(" . ", ". ")
+    line_clean = line_clean.replace(" , ", ", ")
     line_clean = line_clean.replace("@ @", ".")
 
     # make symbols consistent
     replace_dict = {
         "?": ".",
         "!": ".",
+        "&": ".",
+        "%": ".",
+        "$": " ",
+        "#": " ",
         "@": " ",
         '"': " ",
         "-": " ",
@@ -105,27 +109,37 @@ for key in text_lines:
         h_loc = line_clean.find(spkr, h_start)
         h_space = line_clean.find(" ", h_loc)
 
-        # test if character 2 places after space
-        #   is upper (FIRST LAST vs LAST Word), walk
-        #   until success
-        h_test = line_clean[h_space + 2]
-        while h_test.isupper():
-            h_loc = h_space + 1
-            h_space = line_clean.find(" ", h_loc)
+        # add period to location preceding h_loc
+        h_per = h_loc - 1
+        if "." not in line_clean[h_per]:
+            line_clean = line_clean[:h_per] + "." + line_clean[h_per:]
+            h_loc += 1
+            h_space += 1
+
+        # patchy patch for boundary issues (last wordish capitalized)
+        if h_loc < len(line_clean) - 15:
+
+            # test if character 2 places after space
+            #   is upper (FIRST LAST vs LAST Word), walk
+            #   until success.
             h_test = line_clean[h_space + 2]
+            while h_test.isupper():
+                h_loc = h_space + 1
+                h_space = line_clean.find(" ", h_loc)
+                h_test = line_clean[h_space + 2]
 
-        # check for, add colon if needed
-        h_end = h_space + 1
-        if ":" not in line_clean[h_loc:h_end]:
-            h_col = line_clean.find(":", h_end)
-            if c + 1 < len(speaker_list):
-                h_nxt_spkr = line_clean.find(speaker_list[c + 1], h_start)
-                if h_nxt_spkr < h_col:
-                    line_clean = line_clean[:h_space] + ":" + line_clean[h_space:]
-                elif "," not in line_clean[h_end:h_col]:
-                    line_clean = line_clean[:h_space] + ":" + line_clean[h_space:]
+            # check for, add colon if needed
+            h_end = h_space + 1
+            if ":" not in line_clean[h_loc:h_end]:
+                h_col = line_clean.find(":", h_end)
+                if c + 1 < len(speaker_list):
+                    h_nxt_spkr = line_clean.find(speaker_list[c + 1], h_start)
+                    if h_nxt_spkr < h_col:
+                        line_clean = line_clean[:h_space] + ":" + line_clean[h_space:]
+                    elif "," not in line_clean[h_end:h_col]:
+                        line_clean = line_clean[:h_space] + ":" + line_clean[h_space:]
 
-        h_start = h_end
+            h_start = h_end
 
     # determine location of colons, split line by colon
     loc_colons = [i.start() for i in re.finditer(":", line_clean)]
@@ -138,7 +152,6 @@ for key in text_lines:
     line_dict[speaker_name] = []
 
     # start line counter
-    line_total_dict = {}
     line_total = 0
 
     # loop through line sections
@@ -164,8 +177,6 @@ for key in text_lines:
         # write number of words, sentence to dict
         #      at key location previously set
         line_dict[speaker_name] = [num_words, parts_sentence]
-        print(f"{speaker_name}: {num_words}, {parts_sentence}")
-        print("")
 
         # get, add new dict key if we are in bounds
         if ind_count < (len(line_parts) - 1):
@@ -173,7 +184,7 @@ for key in text_lines:
             line_dict[speaker_name] = []
 
     # write line total to dict
-    line_total_dict[key] = line_total
+    line_total_dict[f"line-{key}"] = line_total
 
     # write out parcellated line to out_dir/Line*.csv
     outFile = os.path.join(out_dir, f"Line{key}.csv")
@@ -184,7 +195,6 @@ for key in text_lines:
 
 # get file total
 line_total_dict["Final"] = running_total
-print(running_total)
 
 # write out parcellated line to out_dir/Line*.csv
 outFile = os.path.join(out_dir, "Total_Words.csv")
