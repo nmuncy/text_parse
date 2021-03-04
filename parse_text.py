@@ -165,12 +165,17 @@ def parse_text(in_file, search_list, json_dir, csv_dir):
                         h_space = line_clean.find(" ", h_loc)
                         h_test = line_clean[h_space + 2]
 
-                    # check for, add colon if needed
+                    # check for, add colon if needed.
                     h_end = h_space + 1
                     if ":" not in line_clean[h_loc:h_end]:
                         h_col = line_clean.find(":", h_end)
+
+                        # if another speaker
                         if c + 1 < len(speaker_list):
                             h_nxt_spkr = line_clean.find(speaker_list[c + 1], h_start)
+
+                            # if no colon before next speaker, also
+                            #   check for no comma (for titles, jobs)
                             if h_nxt_spkr < h_col:
                                 line_clean = (
                                     line_clean[:h_space] + ":" + line_clean[h_space:]
@@ -196,7 +201,7 @@ def parse_text(in_file, search_list, json_dir, csv_dir):
         """
 
         # initialize empty dict, add first key. line_dict will have format
-        #   line_dict[key]: [values] = line_dict[speaker]: [word_count, sentence]
+        #   line_dict[speaker]: [word_count, sentence]
         line_dict = {}
         speaker_name = f"0. {line_clean.split(':')[0].split('.')[-1]}"
         line_dict[speaker_name] = []
@@ -224,13 +229,16 @@ def parse_text(in_file, search_list, json_dir, csv_dir):
             running_total += num_words
             line_total += num_words
 
-            # write number of words, sentence to dict
-            #      at key location previously set
-
+            # split sentence by space, search for items
+            #   in search_list, find pre/post indices of match
             sentence_list = parts_no_punc.split(" ")
             sentence_list = list(filter(None, sentence_list))
+
             for search_word in search_list:
                 ind_word = [x for x, y in enumerate(sentence_list) if y == search_word]
+
+                # if word is found, set preceding, current, post
+                #   words if in bounds, else NAN Out...
                 if ind_word:
                     for ind_pos in ind_word:
                         word_prec = (
@@ -245,6 +253,7 @@ def parse_text(in_file, search_list, json_dir, csv_dir):
                             else "NAN Out of Bounds"
                         )
 
+                        # add to matrix
                         df_word_match = np.append(
                             df_word_match, [[word_prec, word_curr, word_post]], axis=0
                         )
@@ -284,7 +293,7 @@ def parse_text(in_file, search_list, json_dir, csv_dir):
         for key, value in line_total_dict.items():
             writer.writerow([key, value])
 
-    # Write out word search
+    # Write out word search, time stamped
     df_out = pd.DataFrame(
         data=df_word_match, columns=["Preceding", "Current", "Subsequent"]
     )
@@ -301,6 +310,8 @@ data_dir = os.path.join(parent_dir, "txt_files")
 data_list = os.listdir(data_dir)
 
 # %%
+# loop through each file, set output dirs,
+#   send file to job function
 for txt_file in data_list:
     in_file = os.path.join(data_dir, txt_file)
 
